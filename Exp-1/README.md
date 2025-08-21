@@ -19,3 +19,15 @@
 
 **Client:** Html,Css,Javascript
 
+### Responsive Banking UI
+
+#### Initial Screen
+![Initial UI](https://github.com/SayanPradhan10/Full-Stack_23BCS10878_KRG-3B/blob/main/Exp-1/IMG-1.png?raw=true)
+
+#### After Deposit
+![Deposit UI](https://github.com/SayanPradhan10/Full-Stack_23BCS10878_KRG-3B/blob/main/Exp-1/IMG-2.png?raw=true)
+
+#### After Withdraw
+![Withdraw UI](https://github.com/SayanPradhan10/Full-Stack_23BCS10878_KRG-3B/blob/main/Exp-1/IMG-3.png?raw=true)
+
+
