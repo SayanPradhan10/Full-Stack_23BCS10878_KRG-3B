@@ -21,9 +21,13 @@
 **Client:** Html,Css,Javascript
 
 ## Output of-Admin Dashboard
-#### Dark Mode
-![Dark Mode](https://github.com/SayanPradhan10/Full-Stack_23BCS10878_KRG-3B/blob/main/Exp-1/IMG-1.png?raw=true)
+#### Dark Mode Pic-1
+![Dark Mode](https://github.com/SayanPradhan10/Full-Stack_23BCS10878_KRG-3B/blob/main/Exp-2/IMG-1.png?raw=true)
 
-#### After Deposit
-![Light Mode](https://github.com/SayanPradhan10/Full-Stack_23BCS10878_KRG-3B/blob/main/Exp-1/IMG-2.png?raw=true)
+#### Dark Mode Pic-2
+![Dark Mode](https://github.com/SayanPradhan10/Full-Stack_23BCS10878_KRG-3B/blob/main/Exp-2/IMG-2.png?raw=true)
+
+#### Light Mode Pic
+![Light Mode](https://github.com/SayanPradhan10/Full-Stack_23BCS10878_KRG-3B/blob/main/Exp-2/IMG-3.png?raw=true)
+
 
