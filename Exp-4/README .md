@@ -24,5 +24,5 @@ https://interactivedrawingtool.netlify.app/
 
 ## Output
 
-![App Screenshot](Screenshot 2025-08-21 at 1.53.09 PM.png)
+![Output_image](https://github.com/SayanPradhan10/Full-Stack_23BCS10878_KRG-3B/blob/main/Exp-4/Output.png?raw=true)
 
