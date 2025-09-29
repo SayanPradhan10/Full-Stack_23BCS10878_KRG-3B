@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Dynamic Product Filter</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <h2>Product Listing</h2>
+
+  <!-- Filter Dropdown -->
+  <label for="category-filter">Filter by Category:</label>
+  <select id="category-filter">
+    <option value="All">All</option>
+    <option value="Electronics">Electronics</option>
+    <option value="Clothing">Clothing</option>
+    <option value="Books">Books</option>
+    <option value="Home">Home</option>
+    <option value="Sports">Sports</option>
+  </select>
+
+  <p id="product-count"></p>
+  <p id="no-products" class="hidden">No products found.</p>
+
+  <div id="products-grid" class="product-container"></div>
+
+  <script src="script.js"></script>
+</body>
+</html>
