@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Interactive SVG Drawing Tool</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="container">
+    <!-- Header -->
+    <div class="header">
+      <h1 class="title">Interactive SVG Drawing Tool</h1>
+      <p class="subtitle">Click on the canvas to draw colorful circles</p>
+    </div>
+
+    <!-- Controls -->
+    <div class="controls">
+      <!-- Color Palette -->
+      <div class="color-palette">
+        <span>Color:</span>
+        <div class="color-buttons">
+          <button class="color-btn active" data-color="hsl(262,80%,55%)" style="background:hsl(262,80%,55%)"></button>
+          <button class="color-btn" data-color="hsl(221,83%,53%)" style="background:hsl(221,83%,53%)"></button>
+          <button class="color-btn" data-color="hsl(142,76%,36%)" style="background:hsl(142,76%,36%)"></button>
+          <button class="color-btn" data-color="hsl(0,84%,60%)" style="background:hsl(0,84%,60%)"></button>
+          <button class="color-btn" data-color="hsl(25,95%,53%)" style="background:hsl(25,95%,53%)"></button>
+          <button class="color-btn" data-color="hsl(48,96%,53%)" style="background:hsl(48,96%,53%)"></button>
+          <button class="color-btn" data-color="hsl(336,84%,60%)" style="background:hsl(336,84%,60%)"></button>
+          <button class="color-btn" data-color="hsl(0,0%,9%)" style="background:hsl(0,0%,9%)"></button>
+        </div>
+      </div>
+
+      <div class="separator"></div>
+
+      <!-- Action Buttons -->
+      <button id="toggle-drawing" class="btn btn-primary">
+        🎨 <span id="drawing-text">Drawing</span>
+      </button>
+      <button id="undo-btn" class="btn btn-secondary" disabled>↶ Undo</button>
+      <button id="clear-btn" class="btn btn-destructive" disabled>🗑 Clear</button>
+    </div>
+
+    <!-- Canvas -->
+    <div class="canvas-container">
+      <svg id="drawing-canvas" width="800" height="600" class="canvas">
+        <defs>
+          <pattern id="grid" width="20" height="20" patternUnits="userSpaceOnUse">
+            <path d="M20 0 L0 0 0 20" fill="none" stroke="hsl(240,8%,90%)" stroke-width="0.5" opacity="0.3"/>
+          </pattern>
+        </defs>
+        <rect width="100%" height="100%" fill="url(#grid)"/>
+      </svg>
+
+      <!-- Circle Counter -->
+      <div class="circle-counter">
+        <span id="circle-count">0</span> circles
+      </div>
+    </div>
+
+    <!-- Instructions -->
+    <div class="instructions">
+      <p>Select a color and click the canvas to draw. Each circle has a random size and smooth animation.</p>
+    </div>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>
+

@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Banking Dashboard</title>
+    <link rel="stylesheet" href="styles.css">
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <header>
+        <h1>Banking Dashboard</h1>
+    </header>
+    <main>
+        <section class="balance-container">
+            <h2>Current Balance</h2>
+            <p id="balance">₹0.00</p>
+        </section>
+        <section class="transaction-container">
+            <form id="transaction-form">
+                <div class="form-group">
+                    <label for="amount">Amount (₹):</label>
+                    <input type="number" id="amount" step="0.01" min="0" placeholder="Enter amount" required>
+                </div>
+                <div class="button-group">
+                    <button type="submit" class="btn deposit" data-action="deposit">Deposit</button>
+                    <button type="submit" class="btn withdraw" data-action="withdraw">Withdraw</button>
+                </div>
+                <p id="error-message" class="error"></p>
+            </form>
+            <div class="history">
+                <h3>Transaction History</h3>
+                <ul id="transaction-history"></ul>
+            </div>
+        </section>
+    </main>
+    <script src="script.js"></script>
+</body>
+</html>
