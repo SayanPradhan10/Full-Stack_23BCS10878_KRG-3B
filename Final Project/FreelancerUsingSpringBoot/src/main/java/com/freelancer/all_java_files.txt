@@ -1,0 +1,2264 @@
+=== C:\Users\sagen\OneDrive\Desktop\Web Dev\class_class\Crowdsourcing_Marketplace_SpringBoot\FreelancerUsingSpringBoot\src\main\java\com\freelancer\Main.java === 
+package com.freelancer;
+
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.context.annotation.Bean;
+import org.springframework.web.servlet.config.annotation.CorsRegistry;
+import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
+import org.springframework.data.jpa.repository.config.EnableJpaAuditing;
+import org.springframework.scheduling.annotation.EnableScheduling;
+
+@SpringBootApplication
+@EnableScheduling
+@EnableJpaAuditing
+public class Main {
+
+    public static void main(String[] args) {
+        SpringApplication.run(Main.class, args);
+    }
+
+    // ✅ Modern CORS configuration (no deprecated adapter)
+    @Bean
+    public WebMvcConfigurer corsConfigurer() {
+        return new WebMvcConfigurer() {
+            @Override
+            public void addCorsMappings(CorsRegistry registry) {
+                registry.addMapping("/**")
+                        .allowedOrigins("http://localhost:3000")
+                        .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS")
+                        .allowCredentials(true);
+            }
+        };
+    }
+}
+
+=== C:\Users\sagen\OneDrive\Desktop\Web Dev\class_class\Crowdsourcing_Marketplace_SpringBoot\FreelancerUsingSpringBoot\src\main\java\com\freelancer\Controller\AttachmentsController.java === 
+package com.freelancer.Controller;
+
+import java.io.BufferedOutputStream;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.util.Date;
+
+import com.freelancer.Entity.Attachments;
+import com.freelancer.Entity.Project;
+import com.freelancer.Entity.User;
+import com.freelancer.Service.AttachmentsService;
+import com.freelancer.Service.ProjectService;
+import com.freelancer.Service.UserService;
+import com.freelancer.Utility.ResultObject;
+import org.json.JSONObject;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.stereotype.Controller;
+import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
+@Controller
+public class AttachmentsController {
+    private static final Logger logger = LoggerFactory.getLogger(UserController.class);
+
+    @Autowired
+    private UserService userService;
+    @Autowired
+    private AttachmentsService attachmentsService;
+    @Autowired
+    private ProjectService projectService;
+
+
+    @RequestMapping(value="/imageUpload")
+    public String singleUpload(){
+        return "singleUpload";
+    }
+
+
+    @RequestMapping(value="/getProjectDocument", method=RequestMethod.POST )
+    public ResponseEntity<?> getProjectDocument(@RequestBody String user){
+        logger.info("Inside getProjectDocument " + user) ;
+        JSONObject jsonObject = new JSONObject(user);
+        ResultObject ro = new ResultObject("Error Fetching Document","",null);
+        try{
+            Attachments attachments = attachmentsService.findById(jsonObject.getLong("id"));
+            ro.setSuccessMsg("Image uploaded Successfully");
+            ro.setErrorMsg("");
+            ro.setData(attachments);
+            return new ResponseEntity(ro, HttpStatus.OK);
+        }catch (Exception e){
+            logger.error(e.getMessage());
+            ro.setErrorMsg("File not found" + e.getMessage());
+            return new ResponseEntity(ro, HttpStatus.BAD_REQUEST);
+        }
+
+    }
+
+    @RequestMapping(value="/imageUpload", method=RequestMethod.POST )
+    public ResponseEntity<?> singleSave(@RequestParam("file") MultipartFile file, @RequestParam("id") int id ){
+        System.out.println("File Description:"+id);
+        String fileName = null;
+        ResultObject ro = new ResultObject("Error Uploading Image","",null);
+        if (!file.isEmpty()) {
+            try {
+                fileName = new Date().getTime()+file.getOriginalFilename();
+                byte[] bytes = file.getBytes();
+                BufferedOutputStream buffStream =
+                        new BufferedOutputStream(new FileOutputStream(new File("../react-client/src/images/" + fileName)));
+                buffStream.write(bytes);
+                buffStream.close();
+                logger.info("Image saved Successfully " + fileName) ;
+
+                Attachments attachments = attachmentsService.save(new Attachments(fileName));
+                User user = userService.findById(id);
+                user.setProfile_id(attachments.getId());
+                userService.updateUser(user);
+                ro.setSuccessMsg("Image uploaded Successfully");
+                ro.setErrorMsg("");
+                return new ResponseEntity(ro, HttpStatus.OK);
+            } catch (Exception e) {
+                ro.setErrorMsg("Failed to upload " + fileName + ": " + e.getMessage());
+                return new ResponseEntity(ro, HttpStatus.BAD_REQUEST);
+
+            }
+        } else {
+            ro.setErrorMsg("Unable to upload. File is empty.");
+            return new ResponseEntity(ro, HttpStatus.BAD_REQUEST);
+        }
+    }
+
+    @RequestMapping(value="/postProject", method=RequestMethod.POST )
+    public ResponseEntity<?> postProject(@RequestParam("file") MultipartFile file, @RequestParam String title,
+                                         @RequestParam String description,@RequestParam String skill,
+                                         @RequestParam Long id,@RequestParam String period,@RequestParam String budget){
+        String fileName = null;
+        ResultObject ro = new ResultObject("Error Posting Project","",null);
+
+        if (!file.isEmpty()) {
+            try {
+                fileName = new Date().getTime()+file.getOriginalFilename();
+                byte[] bytes = file.getBytes();
+                BufferedOutputStream buffStream =
+                        new BufferedOutputStream(new FileOutputStream(new File("../react-client/src/files/" + fileName)));
+                buffStream.write(bytes);
+                buffStream.close();
+                logger.info("File Copied Successfully" + fileName) ;
+                Attachments attachments = attachmentsService.save(new Attachments(fileName));
+                if(attachments.getId()!=null){
+                    logger.info("File Saved Successfully" + fileName) ;
+
+                    Project project = projectService.save(new Project(id,title,description,skill,budget,period,attachments.getId()));
+                    if(project.getId()!=null){
+                        ro.setSuccessMsg("Project Posted Successfully");
+                        ro.setErrorMsg("");
+                        return new ResponseEntity(ro, HttpStatus.OK);
+                    }
+                    else{
+                        ro.setSuccessMsg("");
+                        ro.setErrorMsg("Error Posting Project");
+                        return new ResponseEntity(ro, HttpStatus.OK);
+                    }
+
+                }else{
+                    ro.setSuccessMsg("");
+                    ro.setErrorMsg("Error Saving File");
+                    return new ResponseEntity(ro, HttpStatus.OK);
+                }
+            } catch (Exception e) {
+                ro.setErrorMsg("Failed to upload " + fileName + ": " + e.getMessage());
+                return new ResponseEntity(ro, HttpStatus.BAD_REQUEST);
+            }
+        } else {
+            ro.setErrorMsg("File is empty.");
+            return new ResponseEntity(ro, HttpStatus.BAD_REQUEST);
+        }
+    }
+
+
+
+
+    @RequestMapping(value="/multipleUpload")
+    public String multiUpload(){
+        return "multipleUpload";
+    }
+    @RequestMapping(value="/multipleSave", method=RequestMethod.POST )
+    public @ResponseBody String multipleSave(@RequestParam("file") MultipartFile[] files){
+        String fileName = null;
+        String msg = "";
+        if (files != null && files.length >0) {
+            for(int i =0 ;i< files.length; i++){
+                try {
+                    fileName = files[i].getOriginalFilename();
+                    byte[] bytes = files[i].getBytes();
+                    BufferedOutputStream buffStream =
+                            new BufferedOutputStream(new FileOutputStream(new File("F:/cp/" + fileName)));
+                    buffStream.write(bytes);
+                    buffStream.close();
+                    msg += "You have successfully uploaded " + fileName +"<br/>";
+                } catch (Exception e) {
+                    return "You failed to upload " + fileName + ": " + e.getMessage() +"<br/>";
+                }
+            }
+            return msg;
+        } else {
+            return "Unable to upload. File is empty.";
+        }
+    }
+}.
+=== C:\Users\sagen\OneDrive\Desktop\Web Dev\class_class\Crowdsourcing_Marketplace_SpringBoot\FreelancerUsingSpringBoot\src\main\java\com\freelancer\Controller\BidController.java === 
+package com.freelancer.Controller;
+
+import com.freelancer.Entity.Bid;
+import com.freelancer.Entity.User;
+import com.freelancer.Entity.Project;
+import com.freelancer.POJO.BidDetail;
+import com.freelancer.Service.BidService;
+import com.freelancer.Service.UserService;
+import com.freelancer.Service.ProjectService;
+import com.freelancer.Utility.ResultObject;
+import org.json.JSONObject;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
+import org.springframework.stereotype.Controller;
+import org.springframework.web.bind.annotation.*;
+
+import jakarta.servlet.http.HttpSession;
+import java.util.ArrayList;
+import java.util.List;
+
+@Controller
+public class BidController {
+
+    @Autowired
+    private BidService bidService;
+    @Autowired
+    private UserService userService;
+    @Autowired
+    private ProjectService projectService;
+
+    private static final Logger logger = LoggerFactory.getLogger(BidController.class);
+
+    // ✅ 1. Get all bids
+    @GetMapping(path = "/allBids", produces = MediaType.APPLICATION_JSON_VALUE)
+    public @ResponseBody Iterable<Bid> getAllBids() {
+        return bidService.getAllBids();
+    }
+
+    // ✅ 2. Post or update a bid
+    @PostMapping(path = "/postBid", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<?> postBid(@RequestBody String bidJson, HttpSession session) {
+        ResultObject ro = new ResultObject("Error adding bid", "", null);
+        try {
+            JSONObject json = new JSONObject(bidJson);
+            Bid bid = new Bid();
+
+            // Sanitize and set all fields
+            bid.setUserId(json.getLong("userId"));
+            bid.setProjectId(json.getLong("projectId"));
+            bid.setBid_amount(json.getString("bid_amount"));
+
+            // ✅ Clean period to be only numbers
+            String rawPeriod = json.getString("bid_period");
+            String numericPeriod = rawPeriod.replaceAll("[^0-9]", "");  // keep only digits
+            bid.setBid_period(numericPeriod);
+
+            bid.setBid_status("BID_SENT");
+
+            Bid saved = bidService.save(bid);
+
+            ro.setErrorMsg("");
+            ro.setSuccessMsg("Bid Added");
+            ro.setData(saved);
+
+            return new ResponseEntity<>(ro, HttpStatus.OK);
+
+        } catch (Exception e) {
+            logger.error("Error adding bid: {}", e.getMessage());
+            ro.setErrorMsg(e.getMessage());
+            return new ResponseEntity<>(ro, HttpStatus.BAD_REQUEST);
+        }
+    }
+
+
+    // ✅ 3. Get all bids for a given project (with avg bid)
+    @PostMapping(path = "/getProjectBids/{id}", produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<?> getProjectBids(@PathVariable("id") long projectId) {
+        ResultObject ro = new ResultObject("Error fetching bid", "", null);
+        try {
+            List<Bid> bids = bidService.findByProjectId(projectId);
+            List<BidDetail> bidDetails = new ArrayList<>();
+
+            // Compute average bid for this project
+            double avgBid = 0.0;
+            if (!bids.isEmpty()) {
+                avgBid = bids.stream()
+                        .mapToDouble(b -> Double.parseDouble(b.getBid_amount().replaceAll("[^0-9.]", "")))
+                        .average()
+                        .orElse(0.0);
+            }
+
+            if (!bids.isEmpty()) {
+                for (Bid bid : bids) {
+                    User bidder = userService.findById(bid.getUserId());
+                    Project project = projectService.findById(bid.getProjectId());
+                    User employer = userService.findById(project.getEmployerId());
+
+                    bidDetails.add(new BidDetail(
+                            bid.getId(),
+                            bid.getUserId(),
+                            bid.getProjectId(),
+                            bid.getBid_period(),
+                            bid.getBid_amount(),
+                            bid.getBid_status(),
+                            bidder != null ? bidder.getName() : "Unknown",
+                            project != null ? project.getTitle() : "Untitled",
+                            employer != null ? employer.getName() : "Unknown Employer",
+                            avgBid
+                    ));
+                }
+                ro.setErrorMsg("");
+                ro.setSuccessMsg("Bids Found");
+                ro.setData(bidDetails);
+            } else {
+                ro.setErrorMsg("No bids found for project ID " + projectId);
+            }
+
+            return new ResponseEntity<>(ro, HttpStatus.OK);
+        } catch (Exception e) {
+            logger.error(e.getMessage());
+            ro.setErrorMsg(e.getMessage());
+            return new ResponseEntity<>(ro, HttpStatus.BAD_REQUEST);
+        }
+    }
+
+    // ✅ 4. Get all bids placed by a specific user (Dashboard)
+    @PostMapping(path = "/getUserBidProjects", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<?> getUserBidProjects(@RequestBody String user) {
+        ResultObject ro = new ResultObject("No Bids found", "", null);
+        try {
+            JSONObject jsonObject = new JSONObject(user);
+            long userId = jsonObject.getLong("id");
+
+            List<Bid> bids = bidService.findByUserId(userId);
+            List<BidDetail> bidDetails = new ArrayList<>();
+
+            if (!bids.isEmpty()) {
+                for (Bid bid : bids) {
+                    User bidder = userService.findById(bid.getUserId());
+                    Project project = projectService.findById(bid.getProjectId());
+                    User employer = userService.findById(project.getEmployerId());
+
+                    // Compute avg bid for this project
+                    List<Bid> allProjectBids = bidService.findByProjectId(bid.getProjectId());
+                    double avgBid = 0.0;
+                    if (!allProjectBids.isEmpty()) {
+                        avgBid = allProjectBids.stream()
+                                .mapToDouble(b -> Double.parseDouble(b.getBid_amount().replaceAll("[^0-9.]", "")))
+                                .average()
+                                .orElse(0.0);
+                    }
+
+                    bidDetails.add(new BidDetail(
+                            bid.getId(),
+                            bid.getUserId(),
+                            bid.getProjectId(),
+                            bid.getBid_period(),
+                            bid.getBid_amount(),
+                            bid.getBid_status(),
+                            bidder != null ? bidder.getName() : "Unknown",
+                            project != null ? project.getTitle() : "Untitled",
+                            employer != null ? employer.getName() : "Unknown Employer",
+                            avgBid
+                    ));
+                }
+
+                ro.setErrorMsg("");
+                ro.setSuccessMsg("Bids Found");
+                ro.setData(bidDetails);
+            } else {
+                ro.setErrorMsg("No bids found for user ID " + userId);
+            }
+
+            return new ResponseEntity<>(ro, HttpStatus.OK);
+        } catch (Exception e) {
+            logger.error(e.getMessage());
+            ro.setErrorMsg(e.getMessage());
+            return new ResponseEntity<>(ro, HttpStatus.BAD_REQUEST);
+        }
+    }
+
+}
+.
+=== C:\Users\sagen\OneDrive\Desktop\Web Dev\class_class\Crowdsourcing_Marketplace_SpringBoot\FreelancerUsingSpringBoot\src\main\java\com\freelancer\Controller\HomeController.java === 
+package com.freelancer.Controller;
+
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+@RestController
+public class HomeController {
+
+    @GetMapping("/")
+    public String home() {
+        return "✅ Backend is running fine!";
+    }
+}
+.
+=== C:\Users\sagen\OneDrive\Desktop\Web Dev\class_class\Crowdsourcing_Marketplace_SpringBoot\FreelancerUsingSpringBoot\src\main\java\com\freelancer\Controller\ProjectController.java === 
+package com.freelancer.Controller;
+import java.util.List;
+import java.util.ArrayList;
+import java.time.LocalDateTime;
+
+import com.freelancer.POJO.ProjectDetail;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.multipart.MultipartFile;
+import com.freelancer.Entity.Bid;
+import com.freelancer.Entity.Project;
+import com.freelancer.Entity.User;
+import com.freelancer.Service.BidService;
+import com.freelancer.Service.ObjectService;
+import com.freelancer.Service.ProjectService;
+import com.freelancer.Utility.ResultObject;
+import org.json.JSONObject;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
+import org.springframework.stereotype.Controller;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.ResponseBody;
+
+import jakarta.servlet.http.HttpSession;
+import jakarta.servlet.http.HttpServletRequest;
+import java.util.List;
+import com.freelancer.Service.UserService;
+
+
+@Controller    // This means that this class is a Controller
+public class ProjectController {
+    @Autowired
+    ProjectService projectService;
+    @Autowired
+    BidService bidService;
+    @Autowired
+    private ObjectService objectService;
+    @Autowired
+    private UserService userService;
+
+    private static final Logger logger = LoggerFactory.getLogger(ProjectController.class);
+    @GetMapping(path = "/allProjects", produces = MediaType.APPLICATION_JSON_VALUE)
+    public @ResponseBody
+    Iterable<Project> getAllProjects() {
+        // This returns a JSON with the users
+        logger.info("All Projects Fetched");
+        return projectService.getAllProjects();
+
+    }
+
+    @PostMapping(path = "/getProjectById", consumes = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<?> getProjectById(@RequestBody String project, HttpSession session) {
+        ResultObject ro = new ResultObject("Project not found", "", null);
+
+        JSONObject jsonObject = new JSONObject(project);
+        Project p = projectService.findById(jsonObject.getLong("id"));
+        if (p != null) {
+            ro.setErrorMsg("");
+            ro.setSuccessMsg("Project found");
+            ro.setData(p);
+            logger.info("Project Found");
+            return new ResponseEntity(ro, HttpStatus.OK);
+        } else {
+            ro.setErrorMsg("Project not found");
+            ro.setSuccessMsg("");
+            return new ResponseEntity(ro, HttpStatus.BAD_REQUEST);
+        }
+    }
+
+
+    @PostMapping(path = "/hireFreelancer", consumes = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<?> hireFreelancer(@RequestBody String hireDetails, HttpSession session) {
+        ResultObject ro = new ResultObject("Error Hiring Freelancer", "", null);
+
+        JSONObject jsonObject = new JSONObject(hireDetails);
+        try{
+            long freelancer_id = jsonObject.getLong("freelancerId");
+            Project p = projectService.findById(jsonObject.getLong("projectId"));
+            if (p != null) {
+                p.setEndDate(jsonObject.getString("endDate"));
+                p.setFreelancerId(freelancer_id);
+                projectService.save(p);
+                logger.info("Project Details Updated");
+                logger.info("Updating All Bids");
+
+                List<Bid> bids = bidService.findByProjectId(jsonObject.getLong("projectId"));
+                for (Bid bid:bids) {
+                    logger.info("Updating Bid :"+ bid.toString());
+                    if(bid.getUserId()==freelancer_id){
+                        bid.setBid_status("BID_ACCEPTED");
+                    }else{
+                        bid.setBid_status("BID_REJECTED");
+                    }
+                    bidService.save(bid);
+                }
+                ro.setErrorMsg("");
+                ro.setSuccessMsg("Freelancer detail added to project");
+                ro.setData(p);
+                logger.info("Freelancer Hire Update");
+                return new ResponseEntity(ro, HttpStatus.OK);
+
+            } else {
+                ro.setErrorMsg("Project not found");
+                ro.setSuccessMsg("");
+                return new ResponseEntity(ro, HttpStatus.BAD_REQUEST);
+            }
+        }catch (Exception e){
+            logger.error(e.getMessage());
+            ro.setErrorMsg("Error Hiring Freelancer");
+            ro.setSuccessMsg("");
+            return new ResponseEntity(ro, HttpStatus.BAD_REQUEST);
+        }
+
+    }
+
+    @PostMapping(path = "/getOpenProjects", produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<?> getOpenProjects(@RequestBody String userDetails, HttpSession session) {
+        // This returns a JSON with the users
+        logger.info("Under : getOpenProjects");
+        ResultObject ro = new ResultObject("Error Fetching Open Projects", "", null);
+        try{
+            JSONObject jsonObject = new JSONObject(userDetails);
+            if(jsonObject.has("id")){
+                List data =  objectService.getOpenProjects(Long.parseLong(jsonObject.getString("id")));
+                ro.setErrorMsg("");
+                ro.setSuccessMsg("Open Projects Fetched");
+                ro.setData(data);
+                logger.info("Open Projects Fetched");
+                return new ResponseEntity(ro, HttpStatus.OK);
+            }else{
+                ro.setErrorMsg("No id provided");
+                ro.setSuccessMsg("");
+                return new ResponseEntity(ro, HttpStatus.BAD_REQUEST);
+            }
+
+        }catch (Exception e){
+            logger.error(e.getMessage());
+            ro.setErrorMsg("Error Fetching Open Projects");
+            ro.setSuccessMsg("");
+            return new ResponseEntity(ro, HttpStatus.BAD_REQUEST);
+        }
+    }
+
+    @PostMapping(path = "/getProjectDetail", produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<?> getProjectDetail(@RequestBody String projectDetails, HttpSession session) {
+        // This returns a JSON with the users
+        ResultObject ro = new ResultObject("Error Fetching Project Detail", "", null);
+        try{
+            JSONObject jsonObject = new JSONObject(projectDetails);
+            if(jsonObject.has("id")){
+                List data =  objectService.getProjectDetail(Long.parseLong(jsonObject.getString("id")));
+                ro.setErrorMsg("");
+                ro.setSuccessMsg("Project Detail Fetched");
+                ro.setData(data);
+                logger.info("Open Projects Fetched");
+                return new ResponseEntity(ro, HttpStatus.OK);
+            }else{
+                ro.setErrorMsg("No id provided");
+                ro.setSuccessMsg("");
+                return new ResponseEntity(ro, HttpStatus.BAD_REQUEST);
+            }
+
+        }catch (Exception e){
+            logger.error(e.getMessage());
+            ro.setErrorMsg("Error Fetching Project Detail");
+            ro.setSuccessMsg("");
+            return new ResponseEntity(ro, HttpStatus.BAD_REQUEST);
+        }
+    }
+    @PostMapping(path = "/getUserProjects", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<?> getUserProjects(@RequestBody String user) {
+        ResultObject ro = new ResultObject("No projects found", "", null);
+        try {
+            JSONObject jsonObject = new JSONObject(user);
+            long employerId = jsonObject.getLong("id");
+
+            List<Project> projects = projectService.findByEmployerId(employerId);
+
+            List<ProjectDetail> openProjects = new ArrayList<>();
+            List<ProjectDetail> workInProgressProjects = new ArrayList<>();
+
+            for (Project project : projects) {
+                List<Bid> bids = bidService.findByProjectId(project.getId());
+                double avgBid = 0.0;
+                if (!bids.isEmpty()) {
+                    avgBid = bids.stream()
+                            .mapToDouble(b -> Double.parseDouble(b.getBid_amount().replaceAll("[^0-9.]", "")))
+                            .average()
+                            .orElse(0.0);
+                }
+
+                ProjectDetail detail = new ProjectDetail();
+                detail.setProjectId(project.getId());
+                detail.setProjectTitle(project.getTitle());
+                detail.setProjectSkill(project.getSkill());
+                detail.setProjectBudget(project.getRange());
+                detail.setProjectPeriod(project.getPeriod());
+                detail.setBidCount((long) bids.size());
+                detail.setAverageBid(avgBid);
+                detail.setEmployerId(project.getEmployerId());
+
+                // 🔹 Split by freelancer assignment
+                if (project.getFreelancerId() == null) {
+                    openProjects.add(detail);
+                } else {
+                    detail.setFreelancerId(project.getFreelancerId());
+
+                    // ✅ Fetch freelancer details from userService
+                    User freelancer = userService.findById(project.getFreelancerId());
+                    if (freelancer != null) {
+                        detail.setFreelancerName(freelancer.getName());
+                    } else {
+                        detail.setFreelancerName("Unknown Freelancer");
+                    }
+
+                    detail.setBidStatus("Work In Progress");
+
+                    // Fetch awarded bid details
+                    Bid awardedBid = bids.stream()
+                            .filter(b -> b.getUserId().equals(project.getFreelancerId()))
+                            .findFirst()
+                            .orElse(null);
+
+                    if (awardedBid != null) {
+                        detail.setBidAmount(awardedBid.getBid_amount());
+                    } else {
+                        detail.setBidAmount("-");
+                    }
+
+                    detail.setEndDate(project.getEndDate());
+                    workInProgressProjects.add(detail);
+                }
+            }
+
+            List<List<ProjectDetail>> responseData = new ArrayList<>();
+            responseData.add(openProjects);
+            responseData.add(workInProgressProjects);
+
+            ro.setErrorMsg("");
+            ro.setSuccessMsg("Projects Found");
+            ro.setData(responseData);
+
+            return new ResponseEntity<>(ro, HttpStatus.OK);
+
+        } catch (Exception e) {
+            e.printStackTrace();
+            ro.setErrorMsg(e.getMessage());
+            return new ResponseEntity<>(ro, HttpStatus.BAD_REQUEST);
+        }
+    }
+
+
+
+
+    @PostMapping(path = "/getUserBidProjects", produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<?> getUserBidProjects(@RequestBody String userDetails, HttpSession session) {
+        // This returns a JSON with the users
+        ResultObject ro = new ResultObject("Error Fetching User Projects", "", null);
+        try{
+            JSONObject jsonObject = new JSONObject(userDetails);
+            if(jsonObject.has("id")){
+                List data =  objectService.getUserBidProjects(Long.parseLong(jsonObject.getString("id")));
+                ro.setErrorMsg("");
+                ro.setSuccessMsg("User Projects Fetched");
+                ro.setData(data);
+                logger.info("User Projects Fetched");
+                return new ResponseEntity(ro, HttpStatus.OK);
+            }else{
+                ro.setErrorMsg("No id provided");
+                ro.setSuccessMsg("");
+                return new ResponseEntity(ro, HttpStatus.BAD_REQUEST);
+            }
+        }catch (Exception e){
+            logger.error(e.getMessage());
+            ro.setErrorMsg("Error Fetching User Projects");
+            ro.setSuccessMsg("");
+            return new ResponseEntity(ro, HttpStatus.BAD_REQUEST);
+        }
+    }
+
+    @PostMapping(path = "/postProject", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<?> postProject(
+            @RequestParam("employer_id") Long employerId,
+            @RequestParam("title") String title,
+            @RequestParam("description") String description,
+            @RequestParam("main_skill_id") String mainSkillId,
+            @RequestParam("budget_range") String budgetRange,
+            @RequestParam("budget_period") String budgetPeriod,
+            @RequestParam(value = "file", required = false) MultipartFile file
+    ) {
+        ResultObject ro = new ResultObject("Error posting project", "", null);
+        try {
+            Project project = new Project();
+            project.setEmployerId(employerId);
+            project.setTitle(title);
+            project.setDescription(description);
+            project.setSkill(mainSkillId);
+            project.setRange(budgetRange);
+            String numericPeriod = budgetPeriod.replaceAll("[^0-9]", "");
+            project.setPeriod(numericPeriod);
+            project.setDatePosted(LocalDateTime.now());
+            project.setBidDeadline(LocalDateTime.now().plusDays(7)); // bids close after 7 days
+
+            if (file != null && !file.isEmpty()) {
+                logger.info("File uploaded: " + file.getOriginalFilename());
+            }
+
+            Project saved = projectService.save(project);
+            ro.setErrorMsg("");
+            ro.setSuccessMsg("Project posted successfully!");
+            ro.setData(saved);
+            return new ResponseEntity<>(ro, HttpStatus.OK);
+        } catch (Exception e) {
+            e.printStackTrace();
+            ro.setErrorMsg(e.getMessage());
+            return new ResponseEntity<>(ro, HttpStatus.BAD_REQUEST);
+        }
+    }
+
+
+
+}
+
+
+.
+=== C:\Users\sagen\OneDrive\Desktop\Web Dev\class_class\Crowdsourcing_Marketplace_SpringBoot\FreelancerUsingSpringBoot\src\main\java\com\freelancer\Controller\UserController.java === 
+package com.freelancer.Controller;
+
+import com.freelancer.Entity.Attachments;
+import com.freelancer.Entity.User;
+import com.freelancer.Service.AttachmentsService;
+import com.freelancer.Service.UserService;
+import com.freelancer.Utility.ResultObject;
+import org.json.JSONObject;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
+import org.springframework.stereotype.Controller;
+import org.springframework.web.bind.annotation.*;
+
+import jakarta.servlet.http.HttpSession;
+import jakarta.servlet.http.HttpServletRequest;
+
+
+@Controller
+// This means that this class is a Controller
+//@RequestMapping(path="/user") // This means URL's start with /demo (after Application path)
+public class UserController {
+    @Autowired
+    private AttachmentsService attachmentsService;
+
+    @Autowired
+    private UserService userService;
+
+    private static final Logger logger = LoggerFactory.getLogger(UserController.class);
+
+    @PostMapping(path = "/signup", consumes = MediaType.APPLICATION_JSON_VALUE) // Map ONLY POST Requests
+    public ResponseEntity<?> addNewUser(@RequestBody User user, HttpSession session) {
+        // @ResponseBody means the returned String is the response, not a view name
+        // @RequestParam means it is a parameter from the GET or POST request
+        ResultObject ro = new ResultObject("Email allready Exists", "", null);
+        try {
+            User u = userService.addUser(user);
+            if (u != null) {
+                logger.info("User Created");
+                logger.info(u.toString());
+                session.setAttribute("email", user.getEmail());
+                session.setAttribute("name", user.getName());
+                session.setAttribute("id", user.getId());
+                ro.setErrorMsg("");
+                ro.setSuccessMsg("Signup Success");
+                ro.setData(u);
+                return new ResponseEntity(ro, HttpStatus.OK);
+            } else {
+                logger.info("User allready exists");
+                ro.setErrorMsg("Email allready Exists");
+                ro.setSuccessMsg("");
+                return new ResponseEntity(ro, HttpStatus.OK);
+            }
+        } catch (NullPointerException e) {
+            logger.error(e.getMessage());
+            return new ResponseEntity(ro, HttpStatus.OK);
+        } catch (Exception e) {
+            logger.error(e.getMessage());
+            return new ResponseEntity(ro, HttpStatus.OK);
+        }
+    }
+
+    @GetMapping(path = "/all", produces = MediaType.APPLICATION_JSON_VALUE)
+    public @ResponseBody
+    Iterable<User> getAllUsers() {
+        // This returns a JSON with the users
+        return userService.getAllUsers();
+    }
+
+    @PostMapping(path = "/login", consumes = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<?> login(@RequestBody String user, HttpSession session) {
+        ResultObject ro = new ResultObject("Invalid username & password", "", null);
+        try {
+            JSONObject jsonObject = new JSONObject(user);
+            User data = userService.login(jsonObject.getString("email"), jsonObject.getString("password"));
+            if (data != null) {
+                session.setAttribute("email", data.getEmail());
+                session.setAttribute("name", data.getName());
+                session.setAttribute("id", data.getId());
+                ro.setErrorMsg("");
+                ro.setSuccessMsg("User found...Credentials Valid");
+                ro.setData(data);
+                return new ResponseEntity(ro, HttpStatus.OK);
+            } else {
+                ro.setErrorMsg("Username or password incorrect");
+                ro.setSuccessMsg("");
+                return new ResponseEntity(ro, HttpStatus.OK);
+            }
+        } catch (Exception e) {
+            logger.error(e.getMessage());
+            return new ResponseEntity(ro, HttpStatus.OK);
+        }
+    }
+
+    @PostMapping(path = "/getprofile", consumes = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<?> getprofile(@RequestBody String user, HttpSession session) {
+        ResultObject ro = new ResultObject("User not found", "", null);
+
+        JSONObject jsonObject = new JSONObject(user);
+        User u = userService.findById(jsonObject.getInt("id"));
+        if (u != null) {
+            ro.setErrorMsg("");
+            ro.setSuccessMsg("User found");
+            ro.setData(u);
+            logger.info("User Found");
+            return new ResponseEntity(ro, HttpStatus.OK);
+        } else {
+            ro.setErrorMsg("UUser not found");
+            ro.setSuccessMsg("");
+            return new ResponseEntity(ro, HttpStatus.BAD_REQUEST);
+        }
+    }
+
+    @PostMapping(path = "/getprofileImage", consumes = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<?> getprofileImage(@RequestBody User user, HttpSession session) {
+        JSONObject jsonObject = new JSONObject(user);
+        ResultObject ro = new ResultObject("Error fetching image", "", null);
+        User u = userService.findById(jsonObject.getLong("id"));
+        if (u != null) {
+            logger.info("getprofileImage User Found");
+            if(u.getProfile_id()!=null){
+                Attachments attachments = attachmentsService.findById(u.getProfile_id());
+                if(attachments!=null){
+                    ro.setErrorMsg("");
+                    ro.setSuccessMsg("getprofileImage Image Found");
+                    ro.setData(attachments.getLink());
+                    return new ResponseEntity(ro, HttpStatus.OK);
+                }
+                else{
+                    ro.setErrorMsg("getprofileImage Attachment not found");
+                    return new ResponseEntity(ro, HttpStatus.NOT_FOUND);}
+            }else{
+                ro.setErrorMsg("No profile image available");
+                return new ResponseEntity(ro, HttpStatus.NOT_FOUND);
+            }
+
+        } else {
+            ro.setErrorMsg("User Not found");
+            return new ResponseEntity(ro, HttpStatus.NOT_FOUND);
+        }
+    }
+
+    @PostMapping(value = "/logout", produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<?> logout(HttpSession session) {
+        session.invalidate();
+        ResultObject ro = new ResultObject("", "Logout Successful", null);
+        return new ResponseEntity<>(ro, HttpStatus.OK);
+    }
+
+
+    @GetMapping(value = "/isLoggedIn")
+//    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public ResponseEntity<?> isLoggedIn(HttpSession session) {
+        ResultObject ro = new ResultObject("Session Not Valid", "", null);
+        logger.info("Under /isLoggedIn Post Request");
+        logger.info(session.getAttribute("email")+"");
+
+        if (session.getAttribute("email") != null) {
+            ro.setErrorMsg("");
+            ro.setSuccessMsg("User Allready Logged in");
+            ro.setData(userService.findById(Long.parseLong(session.getAttribute("id")+"")));
+            return new ResponseEntity(ro, HttpStatus.OK);
+            } else {
+            ro.setErrorMsg("Not Logged In");
+            ro.setSuccessMsg("");
+            return new ResponseEntity(ro,HttpStatus.OK);
+        }
+    }
+
+    @PostMapping(path = "/updateProfile", consumes = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<?> updateprofile(@RequestBody String user, HttpSession session) {
+        ResultObject ro = new ResultObject("Error updating user", "", null);
+        try {
+            JSONObject jsonObject = new JSONObject(user);
+            if(!jsonObject.has("id")){
+                ro.setErrorMsg("Please provide Id to update");
+                ro.setSuccessMsg("");
+                return new ResponseEntity(ro, HttpStatus.OK);
+            }
+            User u = userService.findById(jsonObject.getLong("id"));
+            if (u != null) {
+                logger.info("User Found");
+                if(jsonObject.has("name")){
+                    u.setName(jsonObject.getString("name"));
+                }
+                if(jsonObject.has("email")){
+                    u.setEmail(jsonObject.getString("email"));
+                }
+                if(jsonObject.has("about")){
+                    u.setAbout(jsonObject.getString("about"));
+                }
+                if(jsonObject.has("phone")){
+                    u.setPhone(jsonObject.getLong("phone"));
+                }
+                if(jsonObject.has("skills")){
+                    u.setSkills(jsonObject.getString("skills"));
+                }
+                User updatedUser = userService.updateUser(u);
+                if (updatedUser  != null) {
+                    logger.info("User Updated");
+                    logger.info(u.toString());
+                    session.setAttribute("email", updatedUser.getEmail());
+                    ro.setErrorMsg("");
+                    ro.setSuccessMsg("Update Success");
+                    ro.setData(u);
+                    return new ResponseEntity(ro, HttpStatus.OK);
+                } else {
+                    logger.info("Email allready Exist");
+                    ro.setErrorMsg("Email allready Exists");
+                    ro.setSuccessMsg("");
+                    return new ResponseEntity(ro, HttpStatus.OK);
+                }
+            } else {
+                return new ResponseEntity(HttpStatus.NOT_FOUND);
+            }
+        }catch (Exception e){
+            logger.error(e.getMessage());
+            return new ResponseEntity(ro, HttpStatus.OK);
+
+        }
+
+    }
+
+
+}.
+=== C:\Users\sagen\OneDrive\Desktop\Web Dev\class_class\Crowdsourcing_Marketplace_SpringBoot\FreelancerUsingSpringBoot\src\main\java\com\freelancer\Entity\Attachments.java === 
+package com.freelancer.Entity;
+
+import com.fasterxml.jackson.annotation.JsonAutoDetect;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import org.springframework.data.annotation.CreatedDate;
+import org.springframework.data.jpa.domain.support.AuditingEntityListener;
+
+import jakarta.persistence.*;
+import jakarta.validation.constraints.*;
+import java.io.Serializable;
+import java.util.Date;
+
+@JsonAutoDetect(fieldVisibility = JsonAutoDetect.Visibility.ANY)
+@Entity
+@Table(name = "attachments")
+@EntityListeners(AuditingEntityListener.class)
+public class Attachments implements Serializable {
+    @Id
+    @GeneratedValue(strategy = GenerationType.AUTO)
+    private Long id;
+
+    @NotBlank
+    private String link;
+
+
+
+    public Long getId() {
+        return id;
+    }
+
+    public void setId(Long id) {
+        this.id = id;
+    }
+
+    public String getLink() {
+        return link;
+    }
+
+    public void setLink(String link) {
+        this.link = link;
+    }
+
+    public Attachments() {
+    }
+
+    public Attachments(String link) {
+        this.link = link;
+    }
+}
+.
+=== C:\Users\sagen\OneDrive\Desktop\Web Dev\class_class\Crowdsourcing_Marketplace_SpringBoot\FreelancerUsingSpringBoot\src\main\java\com\freelancer\Entity\Bid.java === 
+package com.freelancer.Entity;
+
+import com.fasterxml.jackson.annotation.JsonAutoDetect;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import org.springframework.data.annotation.CreatedDate;
+import org.springframework.data.jpa.domain.support.AuditingEntityListener;
+
+import jakarta.persistence.*;
+import jakarta.validation.constraints.*;
+import java.io.Serializable;
+import java.util.Date;
+
+@JsonAutoDetect(fieldVisibility = JsonAutoDetect.Visibility.ANY)
+@Entity
+@Table(name = "bid")
+@EntityListeners(AuditingEntityListener.class)
+public class Bid implements Serializable {
+    @Id
+    @GeneratedValue(strategy = GenerationType.AUTO)
+    private Long id;
+
+    @NotNull
+    @Column(name = "user_id")
+    private Long userId;
+
+    @NotNull
+    @Column(name = "project_id")
+    private Long projectId;
+
+    @NotBlank
+    private String bid_period;
+
+    @NotBlank
+    private String bid_amount;
+
+    @NotBlank
+    private String bid_status;
+
+    public Bid(){
+
+    }
+
+    public Bid(Long id, @NotNull Long userId, @NotNull Long projectId, @NotBlank String bid_period, @NotBlank String bid_amount, @NotBlank String bid_status) {
+        this.id = id;
+        this.userId = userId;
+        this.projectId = projectId;
+        this.bid_period = bid_period;
+        this.bid_amount = bid_amount;
+        this.bid_status = bid_status;
+    }
+
+    public Long getUserId() {
+        return userId;
+    }
+
+    public void setUserId(Long userId) {
+        this.userId = userId;
+    }
+
+    public Long getProjectId() {
+        return projectId;
+    }
+
+    public void setProjectId(Long projectId) {
+        this.projectId = projectId;
+    }
+
+    public Long getId() {
+        return id;
+    }
+
+    public void setId(Long id) {
+        this.id = id;
+    }
+
+    public String getBid_period() {
+        return bid_period;
+    }
+
+    public void setBid_period(String bid_period) {
+        this.bid_period = bid_period;
+    }
+
+    public String getBid_amount() {
+        return bid_amount;
+    }
+
+    public void setBid_amount(String bid_amount) {
+        this.bid_amount = bid_amount;
+    }
+
+    public String getBid_status() {
+        return bid_status;
+    }
+
+    public void setBid_status(String bid_status) {
+        this.bid_status = bid_status;
+    }
+}
+.
+=== C:\Users\sagen\OneDrive\Desktop\Web Dev\class_class\Crowdsourcing_Marketplace_SpringBoot\FreelancerUsingSpringBoot\src\main\java\com\freelancer\Entity\Project.java === 
+package com.freelancer.Entity;
+import java.time.LocalDateTime;
+
+import com.fasterxml.jackson.annotation.JsonAutoDetect;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import org.springframework.data.annotation.CreatedDate;
+import org.springframework.data.jpa.domain.support.AuditingEntityListener;
+
+import jakarta.persistence.*;
+import jakarta.validation.constraints.*;
+import java.io.Serializable;
+import java.util.Date;
+
+@JsonAutoDetect(fieldVisibility = JsonAutoDetect.Visibility.ANY)
+@Entity
+@Table(name = "project")
+@EntityListeners(AuditingEntityListener.class)
+@JsonIgnoreProperties(value = {"createdAt"},
+        allowGetters = true)
+public class Project implements Serializable {
+    @Id
+    @GeneratedValue(strategy = GenerationType.AUTO)
+    private Long id;
+
+    @NotNull
+    @Column(name = "employer_id")
+    private Long employerId;
+
+    @Column(name = "freelancer_id")
+    private Long freelancerId;
+
+    @NotBlank
+    private String title;
+
+    @NotBlank
+    private String description;
+
+    @NotBlank
+    @Column(name = "main_skill_id")
+    private String skill;
+
+    @NotBlank
+    @Column(name = "budget_range")
+    private String range;
+
+    @NotBlank
+    @Column(name = "budget_period")
+    private String period;
+
+    // @Column(name = "date_posted",nullable = false, updatable = false)
+    // @Temporal(TemporalType.TIMESTAMP)
+    // @CreatedDate
+    // private Date createdAt;
+
+    @Column(name="end_date")
+    private String endDate;
+
+    @Column(name = "bid_deadline")
+    private LocalDateTime bidDeadline;
+
+    @Column(name = "status")
+    private String status = "OPEN";
+
+    @Column(name = "date_posted")
+    private LocalDateTime datePosted;
+
+    private Long document_id;
+
+    public Project(){
+
+    }
+    public Project(@NotNull Long employerId,@NotBlank String title, @NotBlank String description, @NotBlank String skill, @NotBlank String range, @NotBlank String period, @NotBlank Long document_id) {
+        this.employerId = employerId;
+        this.title = title;
+        this.description = description;
+        this.skill = skill;
+        this.range = range;
+        this.period = period;
+        this.document_id = document_id;
+    }
+
+    public Long getId() {
+        return id;
+    }
+
+    public void setId(Long id) {
+        this.id = id;
+    }
+
+    public Long getEmployerId() {
+        return employerId;
+    }
+
+    public void setEmployerId(Long employerId) {
+        this.employerId = employerId;
+    }
+
+    public Long getFreelancerId() {
+        return freelancerId;
+    }
+
+    public void setFreelancerId(Long freelancerId) {
+        this.freelancerId = freelancerId;
+    }
+
+    public String getTitle() {
+        return title;
+    }
+
+    public void setTitle(String title) {
+        this.title = title;
+    }
+
+    public String getDescription() {
+        return description;
+    }
+
+    public void setDescription(String description) {
+        this.description = description;
+    }
+
+    public String getSkill() {
+        return skill;
+    }
+
+    public void setSkill(String skill) {
+        this.skill = skill;
+    }
+
+    public String getRange() {
+        return range;
+    }
+
+    public void setRange(String range) {
+        this.range = range;
+    }
+
+    public String getPeriod() {
+        return period;
+    }
+
+    public void setPeriod(String period) {
+        this.period = period;
+    }
+    
+    public String getEndDate() {
+        return endDate;
+    }
+
+    public void setEndDate(String endDate) {
+        this.endDate = endDate;
+    }
+
+    public Long getDocument_id() {
+        return document_id;
+    }
+
+    public void setDocument_id(Long document_id) {
+        this.document_id = document_id;
+    }
+
+    public String getStatus() {
+        return status;
+    }
+
+    public void setStatus(String status) {
+        this.status = status;
+    }
+
+    public LocalDateTime getBidDeadline() {
+        return bidDeadline;
+    }
+
+    public void setBidDeadline(LocalDateTime bidDeadline) {
+        this.bidDeadline = bidDeadline;
+    }
+
+    public LocalDateTime getDatePosted() {
+        return datePosted;
+    }
+
+    public void setDatePosted(LocalDateTime datePosted) {
+        this.datePosted = datePosted;
+    }
+}
+.
+=== C:\Users\sagen\OneDrive\Desktop\Web Dev\class_class\Crowdsourcing_Marketplace_SpringBoot\FreelancerUsingSpringBoot\src\main\java\com\freelancer\Entity\User.java === 
+package com.freelancer.Entity;
+
+import com.fasterxml.jackson.annotation.JsonAutoDetect;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonInclude;
+import org.springframework.data.annotation.CreatedDate;
+import org.springframework.data.annotation.LastModifiedDate;
+import org.springframework.data.jpa.domain.support.AuditingEntityListener;
+
+import jakarta.persistence.*;
+import jakarta.validation.constraints.*;
+import java.io.Serializable;
+import java.util.Date;
+
+@JsonAutoDetect(fieldVisibility = JsonAutoDetect.Visibility.ANY)
+@Entity
+@Table(name = "user")
+@EntityListeners(AuditingEntityListener.class)
+@JsonIgnoreProperties(value = {"createdAt"},
+        allowGetters = true)
+public class User implements Serializable {
+    @Id
+    @GeneratedValue(strategy = GenerationType.AUTO)
+    private Long id;
+
+    @NotBlank
+    private String name;
+
+    @NotBlank
+    private String email;
+
+    public Long getId() {
+        return id;
+    }
+
+    public void setId(Long id) {
+        this.id = id;
+    }
+
+    public String getName() {
+        return name;
+    }
+
+    public void setName(String name) {
+        this.name = name;
+    }
+
+    public String getEmail() {
+        return email;
+    }
+
+    public void setEmail(String email) {
+        this.email = email;
+    }
+
+    public String getPassword() {
+        return password;
+    }
+
+    public void setPassword(String password) {
+        this.password = password;
+    }
+
+    public Long getPhone() {
+        return phone;
+    }
+
+    public void setPhone(Long phone) {
+        this.phone = phone;
+    }
+
+    public String getAbout() {
+        return about;
+    }
+
+    public void setAbout(String about) {
+        this.about = about;
+    }
+
+    public Long getProfile_id() {
+        return profile_id;
+    }
+
+    public void setProfile_id(Long profile_id) {
+        this.profile_id = profile_id;
+    }
+
+    public String getSkills() {
+        return skills;
+    }
+
+    public void setSkills(String skills) {
+        this.skills = skills;
+    }
+
+    @NotBlank
+    private String password;
+
+
+    private Long phone;
+    private String about;
+    private Long profile_id;
+    private String skills;
+
+    @Column(name = "registration",nullable = false, updatable = false)
+    @Temporal(TemporalType.TIMESTAMP)
+    @CreatedDate
+    private Date createdAt;
+
+//    @Column(nullable = false)
+//    @Temporal(TemporalType.TIMESTAMP)
+//    @LastModifiedDate
+//    private Date updatedAt;
+
+    public User() {
+    }
+
+    public User(String name, String email, String password) {
+
+        this.name = name;
+        this.email = email;
+        this.password = password;
+    }
+
+    public User(String name, String email, String password, long phone, String about, String skills) {
+        this.name = name;
+        this.email = email;
+        this.password = password;
+        this.phone = phone;
+        this.about = about;
+        this.skills = skills;
+    }
+}
+.
+=== C:\Users\sagen\OneDrive\Desktop\Web Dev\class_class\Crowdsourcing_Marketplace_SpringBoot\FreelancerUsingSpringBoot\src\main\java\com\freelancer\exception\ResourceNotFoundException.java === 
+package com.freelancer.exception;
+
+import org.springframework.http.HttpStatus;
+import org.springframework.web.bind.annotation.ResponseStatus;
+
+@ResponseStatus(value = HttpStatus.NOT_FOUND)
+public class ResourceNotFoundException extends RuntimeException {
+    private String resourceName;
+    private String fieldName;
+    private Object fieldValue;
+
+    public ResourceNotFoundException( String resourceName, String fieldName, Object fieldValue) {
+        super(String.format("%s not found with %s : '%s'", resourceName, fieldName, fieldValue));
+        this.resourceName = resourceName;
+        this.fieldName = fieldName;
+        this.fieldValue = fieldValue;
+    }
+
+    public String getResourceName() {
+        return resourceName;
+    }
+
+    public String getFieldName() {
+        return fieldName;
+    }
+
+    public Object getFieldValue() {
+        return fieldValue;
+    }
+}
+.
+=== C:\Users\sagen\OneDrive\Desktop\Web Dev\class_class\Crowdsourcing_Marketplace_SpringBoot\FreelancerUsingSpringBoot\src\main\java\com\freelancer\POJO\BidDetail.java === 
+package com.freelancer.POJO;
+
+public class BidDetail {
+    private Long id;
+    private Long userId;
+    private Long projectId;
+    private String bid_period;
+    private String bid_amount;
+    private String bid_status;
+    private String userName;
+    private String projectTitle;
+    private String employerName;
+    private double averageBid;
+
+    public BidDetail(Long id, Long userId, Long projectId, String bid_period,
+                    String bid_amount, String bid_status, String userName,
+                    String projectTitle, String employerName, double averageBid) {
+        this.id = id;
+        this.userId = userId;
+        this.projectId = projectId;
+        this.bid_period = bid_period;
+        this.bid_amount = bid_amount;
+        this.bid_status = bid_status;
+        this.userName = userName;
+        this.projectTitle = projectTitle;
+        this.employerName = employerName;
+        this.averageBid = averageBid;
+    }
+
+    public double getAverageBid() { return averageBid; }
+    public void setAverageBid(double averageBid) { this.averageBid = averageBid; }
+
+    // Getters and setters for all fields
+    public Long getId() { return id; }
+    public void setId(Long id) { this.id = id; }
+
+    public Long getUserId() { return userId; }
+    public void setUserId(Long userId) { this.userId = userId; }
+
+    public Long getProjectId() { return projectId; }
+    public void setProjectId(Long projectId) { this.projectId = projectId; }
+
+    public String getBid_period() { return bid_period; }
+    public void setBid_period(String bid_period) { this.bid_period = bid_period; }
+
+    public String getBid_amount() { return bid_amount; }
+    public void setBid_amount(String bid_amount) { this.bid_amount = bid_amount; }
+
+    public String getBid_status() { return bid_status; }
+    public void setBid_status(String bid_status) { this.bid_status = bid_status; }
+
+    public String getUserName() { return userName; }
+    public void setUserName(String userName) { this.userName = userName; }
+
+    public String getProjectTitle() { return projectTitle; }
+    public void setProjectTitle(String projectTitle) { this.projectTitle = projectTitle; }
+
+    public String getEmployerName() { return employerName; }
+    public void setEmployerName(String employerName) { this.employerName = employerName; }
+}
+.
+=== C:\Users\sagen\OneDrive\Desktop\Web Dev\class_class\Crowdsourcing_Marketplace_SpringBoot\FreelancerUsingSpringBoot\src\main\java\com\freelancer\POJO\ProjectDetail.java === 
+package com.freelancer.POJO;
+
+public class ProjectDetail {
+
+    private String freelancerName;
+    private String employerName;
+    private Long freelancerId;
+    private Long employerId;
+    private String projectTitle;
+    private Long projectId;
+    private String projectDescription;
+    private String projectSkill;
+    private String projectPeriod;
+    private String projectBudget;
+    private Long bidCount;
+    private Double averageBid;
+    private String documentPath;
+    private Long documentId;
+    private String endDate;
+    private String bidAmount;
+    private String bidStatus;
+
+    public String getEndDate() {
+        return endDate;
+    }
+
+    public void setEndDate(String endDate) {
+        this.endDate = endDate;
+    }
+
+    public String getBidAmount() {
+        return bidAmount;
+    }
+
+    public void setBidAmount(String bidAmount) {
+        this.bidAmount = bidAmount;
+    }
+
+    public String getBidStatus() {
+        return bidStatus;
+    }
+
+    public void setBidStatus(String bidStatus) {
+        this.bidStatus = bidStatus;
+    }
+
+    public String getDocumentPath() {
+        return documentPath;
+    }
+
+    public void setDocumentPath(String documentPath) {
+        this.documentPath = documentPath;
+    }
+
+    public Long getDocumentId() {
+        return documentId;
+    }
+
+    public void setDocumentId(Long documentId) {
+        this.documentId = documentId;
+    }
+
+    public Long getProjectId() {
+        return projectId;
+    }
+
+    public void setProjectId(Long projectId) {
+        this.projectId = projectId;
+    }
+
+    public String getFreelancerName() {
+        return freelancerName;
+    }
+
+    public void setFreelancerName(String freelancerName) {
+        this.freelancerName = freelancerName;
+    }
+
+    public String getEmployerName() {
+        return employerName;
+    }
+
+    public void setEmployerName(String employerName) {
+        this.employerName = employerName;
+    }
+
+    public Long getFreelancerId() {
+        return freelancerId;
+    }
+
+    public void setFreelancerId(Long freelancerId) {
+        this.freelancerId = freelancerId;
+    }
+
+    public Long getEmployerId() {
+        return employerId;
+    }
+
+    public void setEmployerId(Long employerId) {
+        this.employerId = employerId;
+    }
+
+    public String getProjectTitle() {
+        return projectTitle;
+    }
+
+    public void setProjectTitle(String projectTitle) {
+        this.projectTitle = projectTitle;
+    }
+
+    public String getProjectDescription() {
+        return projectDescription;
+    }
+
+    public void setProjectDescription(String projectDescription) {
+        this.projectDescription = projectDescription;
+    }
+
+    public String getProjectSkill() {
+        return projectSkill;
+    }
+
+    public void setProjectSkill(String projectSkill) {
+        this.projectSkill = projectSkill;
+    }
+
+    public String getProjectPeriod() {
+        return projectPeriod;
+    }
+
+    public void setProjectPeriod(String projectPeriod) {
+        this.projectPeriod = projectPeriod;
+    }
+
+    public String getProjectBudget() {
+        return projectBudget;
+    }
+
+    public void setProjectBudget(String projectBudget) {
+        this.projectBudget = projectBudget;
+    }
+
+    public Long getBidCount() {
+        return bidCount;
+    }
+
+    public void setBidCount(Long bidCount) {
+        this.bidCount = bidCount;
+    }
+
+    public Double getAverageBid() {
+        return averageBid;
+    }
+
+    public void setAverageBid(Double averageBid) {
+        this.averageBid = averageBid;
+    }
+}
+.
+=== C:\Users\sagen\OneDrive\Desktop\Web Dev\class_class\Crowdsourcing_Marketplace_SpringBoot\FreelancerUsingSpringBoot\src\main\java\com\freelancer\Repository\AttachmentsRepository.java === 
+package com.freelancer.Repository;
+
+import com.freelancer.Entity.Attachments;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.stereotype.Repository;
+
+@Repository
+public interface AttachmentsRepository extends JpaRepository<Attachments, Long> {
+}
+.
+=== C:\Users\sagen\OneDrive\Desktop\Web Dev\class_class\Crowdsourcing_Marketplace_SpringBoot\FreelancerUsingSpringBoot\src\main\java\com\freelancer\Repository\BidRepository.java === 
+package com.freelancer.Repository;
+
+import com.freelancer.Entity.Bid;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.stereotype.Repository;
+
+import java.util.List;
+
+@Repository
+public interface BidRepository extends JpaRepository<Bid, Long> {
+//    List<Bid> findByProjectIdAndUserId(Long project_id,Long user_id);
+    List<Bid> findByProjectId(Long project_id);
+    List<Bid> findByUserId(long userId);
+
+}
+.
+=== C:\Users\sagen\OneDrive\Desktop\Web Dev\class_class\Crowdsourcing_Marketplace_SpringBoot\FreelancerUsingSpringBoot\src\main\java\com\freelancer\Repository\ProjectRepository.java === 
+package com.freelancer.Repository;
+import java.util.List;
+import java.util.ArrayList;
+
+import com.freelancer.Entity.Project;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.stereotype.Repository;
+
+@Repository
+public interface ProjectRepository extends JpaRepository<Project, Long> {
+     List<Project> findByEmployerId(Long employerId);
+}
+.
+=== C:\Users\sagen\OneDrive\Desktop\Web Dev\class_class\Crowdsourcing_Marketplace_SpringBoot\FreelancerUsingSpringBoot\src\main\java\com\freelancer\Repository\UserRepository.java === 
+package com.freelancer.Repository;
+
+import com.freelancer.Entity.User;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.stereotype.Repository;
+import java.util.List;
+
+
+@Repository
+public interface UserRepository extends JpaRepository<User, Long> {
+    List<User> findByEmailAndPassword(String email, String password);
+    User findByEmail(String email);
+
+}
+.
+=== C:\Users\sagen\OneDrive\Desktop\Web Dev\class_class\Crowdsourcing_Marketplace_SpringBoot\FreelancerUsingSpringBoot\src\main\java\com\freelancer\Scheduler\BidScheduler.java === 
+package com.freelancer.Scheduler;
+
+import com.freelancer.Entity.Project;
+import com.freelancer.Entity.Bid;
+import com.freelancer.Service.ProjectService;
+import com.freelancer.Service.BidService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.scheduling.annotation.Scheduled;
+import org.springframework.stereotype.Component;
+
+import java.time.LocalDateTime;
+import java.util.Comparator;
+import java.util.List;
+
+@Component
+public class BidScheduler {
+
+    private static final Logger logger = LoggerFactory.getLogger(BidScheduler.class);
+
+    @Autowired
+    private ProjectService projectService;
+
+    @Autowired
+    private BidService bidService;
+
+    // 🔁 Run every 10 seconds for testing
+    @Scheduled(fixedRate = 10 * 1000)
+    public void closeExpiredBids() {
+        logger.info("Running scheduled bid closing job...");
+
+        try {
+            List<Project> projects = (List<Project>) projectService.getAllProjects();
+
+            for (Project project : projects) {
+                // ✅ skip if no deadline or already closed
+                if (project.getBidDeadline() == null || !"OPEN".equalsIgnoreCase(project.getStatus()))
+                    continue;
+
+                // ✅ if current time is after deadline → close it
+                if (LocalDateTime.now().isAfter(project.getBidDeadline())) {
+                    logger.info("Closing project: {}", project.getTitle());
+
+                    List<Bid> bids = bidService.findByProjectId(project.getId());
+
+                    if (!bids.isEmpty()) {
+                        // ✅ choose best (lowest) bid
+                        Bid bestBid = bids.stream()
+                                .min(Comparator.comparingDouble(b ->
+                                        Double.parseDouble(b.getBid_amount().replaceAll("[^0-9.]", "")))
+                                ).orElse(null);
+
+                        if (bestBid != null) {
+                            logger.info("Awarding project {} to freelancer {}", project.getId(), bestBid.getUserId());
+                            project.setFreelancerId(bestBid.getUserId());
+                            project.setStatus("CLOSED");
+                            projectService.save(project);
+
+                            // Update bid statuses
+                            for (Bid bid : bids) {
+                                bid.setBid_status(bid.equals(bestBid) ? "BID_ACCEPTED" : "BID_REJECTED");
+                                bidService.save(bid);
+                            }
+                        }
+                    } else {
+                        logger.info("No bids found for project {}", project.getId());
+                        project.setStatus("CLOSED_NO_BIDS");
+                        projectService.save(project);
+                    }
+                }
+            }
+
+        } catch (Exception e) {
+            logger.error("Error during bid closing job: {}", e.getMessage());
+        }
+
+        logger.info("Bid closing job completed.");
+    }
+}
+.
+=== C:\Users\sagen\OneDrive\Desktop\Web Dev\class_class\Crowdsourcing_Marketplace_SpringBoot\FreelancerUsingSpringBoot\src\main\java\com\freelancer\Service\AttachmentsService.java === 
+package com.freelancer.Service;
+
+import com.freelancer.Entity.Attachments;
+import com.freelancer.Repository.AttachmentsRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+
+import java.util.Optional;
+
+@Service
+public class AttachmentsService {
+
+    @Autowired
+    private AttachmentsRepository attachmentsRepository;
+    private static final Logger logger = LoggerFactory.getLogger(AttachmentsService.class);
+
+    public Attachments findById(long id) {
+        Optional<Attachments> exist = attachmentsRepository.findById(id);
+        if(exist.isPresent()){
+            return exist.get();
+        }else{
+            return null;
+        }
+    }
+
+    public Attachments save(Attachments attachments) {
+    Attachments att = attachmentsRepository.save(attachments);
+    return att;
+
+    }
+}
+
+.
+=== C:\Users\sagen\OneDrive\Desktop\Web Dev\class_class\Crowdsourcing_Marketplace_SpringBoot\FreelancerUsingSpringBoot\src\main\java\com\freelancer\Service\BidService.java === 
+package com.freelancer.Service;
+
+import com.freelancer.Entity.Attachments;
+import com.freelancer.Entity.Bid;
+import com.freelancer.Entity.User;
+import com.freelancer.Repository.AttachmentsRepository;
+import com.freelancer.Repository.BidRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+
+import java.util.List;
+import java.util.Optional;
+
+
+@Service
+public class BidService{
+
+    @Autowired
+    private BidRepository bidRepository;
+    private static final Logger logger = LoggerFactory.getLogger(BidService.class);
+
+    public Bid findById(long id) {
+        Optional<Bid> exist = bidRepository.findById(id);
+        if(exist.isPresent()){
+            return exist.get();
+        }else{
+            return null;
+        }
+    }
+
+    public List<Bid> findByUserId(long userId) {
+        return bidRepository.findByUserId(userId);
+    }
+
+
+    public Iterable<Bid> getAllBids(){
+        return bidRepository.findAll();
+    }
+
+    public Bid save(Bid bid) {
+        Bid b = bidRepository.save(bid);
+        return b;
+    }
+
+
+    public List<Bid> findByProjectId(long id){
+        return bidRepository.findByProjectId(id);
+    }
+
+}
+
+.
+=== C:\Users\sagen\OneDrive\Desktop\Web Dev\class_class\Crowdsourcing_Marketplace_SpringBoot\FreelancerUsingSpringBoot\src\main\java\com\freelancer\Service\ObjectService.java === 
+package com.freelancer.Service;
+
+import ch.qos.logback.core.net.SyslogOutputStream;
+import com.freelancer.Entity.Project;
+import com.freelancer.POJO.ProjectDetail;
+import org.springframework.stereotype.Service;
+
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
+import java.util.ArrayList;
+import java.util.List;
+
+@Service
+public class ObjectService{
+
+    @PersistenceContext
+    private EntityManager em;
+
+    public List getAverageBid(){
+        List<Object> results = em.createNativeQuery("SELECT * FROM user").getResultList();
+        return results;
+    }
+
+
+    public List<ProjectDetail> getOpenProjects(long userId){
+        String query="select c.name,sub1.* from (select a.id,a.freelancer_id,a.employer_id,a.title,a.main_skill_id,a.budget_range," +
+                "a.budget_period,COALESCE(avg(b.bid_amount),0) as average ,count(b.project_id) as count from project a left outer " +
+                "join bid b on a.id=b.project_id group by a.id,a.title) as sub1,user c where c.id=sub1.employer_id and" +
+                " employer_id!=" + userId + " and sub1.freelancer_id IS NULL";
+        List<Object[]> results = em.createNativeQuery(query).getResultList();
+        List<ProjectDetail> processedResults = new ArrayList<>();
+        for (Object obj[]:results) {
+            System.out.println(obj);
+            ProjectDetail projectDetail = new ProjectDetail();
+            projectDetail.setEmployerName(obj[0].toString());
+            projectDetail.setProjectId(Long.parseLong(obj[1]+""));
+            projectDetail.setEmployerId(Long.parseLong(obj[3]+""));
+            projectDetail.setProjectTitle(obj[4].toString());
+            projectDetail.setProjectSkill(obj[5].toString());
+            projectDetail.setProjectBudget(obj[6].toString());
+            projectDetail.setProjectPeriod(obj[7].toString());
+            projectDetail.setAverageBid(Double.parseDouble(obj[8]+""));
+            projectDetail.setBidCount(Long.parseLong(obj[9]+""));
+            processedResults.add(projectDetail);
+        }
+        return processedResults;
+    }
+
+    public List<ProjectDetail> getProjectDetail(long projectId){
+        String query="select sub1.*,b.link from (select a.id,a.freelancer_id,a.document_id,a.description,a.employer_id,a.title" +
+                ",a.main_skill_id,a.budget_range,a.budget_period,COALESCE(avg(b.bid_amount),0) as average,count(b.project_id) " +
+                "as count from project a left outer join bid b on a.id=b.project_id group by a.id,a.title) as sub1,attachments " +
+                "b where b.id=sub1.document_id  and sub1.id=" + projectId;
+        List<Object[]> results = em.createNativeQuery(query).getResultList();
+        List<ProjectDetail> processedResults = new ArrayList<>();
+        for (Object obj[]:results) {
+            System.out.println(obj.toString());
+            ProjectDetail projectDetail = new ProjectDetail();
+            projectDetail.setProjectId(Long.parseLong(obj[0]+""));
+            projectDetail.setFreelancerId(Long.parseLong(obj[1]+""));
+            projectDetail.setDocumentId(Long.parseLong(obj[2]+""));
+            projectDetail.setProjectDescription(obj[3].toString());
+            projectDetail.setEmployerId(Long.parseLong(obj[4]+""));
+            projectDetail.setProjectTitle(obj[5].toString());
+            projectDetail.setProjectSkill(obj[6].toString());
+            projectDetail.setProjectBudget(obj[7].toString());
+            projectDetail.setProjectPeriod(obj[8].toString());
+            projectDetail.setAverageBid(Double.parseDouble(obj[9]+""));
+            projectDetail.setBidCount(Long.parseLong(obj[10]+""));
+            projectDetail.setDocumentPath(obj[11].toString());
+            processedResults.add(projectDetail);
+        }
+        return processedResults;
+    }
+
+
+    public List<ProjectDetail> getUserOpenProjects(long userId){
+        String query="select a.id,a.employer_id,a.title,a.budget_range,a.budget_period,COALESCE(avg(b.bid_amount),0) as average ," +
+                "count(b.project_id) as count from project a left outer join bid b on a.id=b.project_id and b.bid_status='BID_SENT' " +
+                "where a.employer_id=" + userId +  " and a.freelancer_id is NULL group by a.id,a.title";
+        List<Object[]> results = em.createNativeQuery(query).getResultList();
+        List<ProjectDetail> processedResults = new ArrayList<>();
+        for (Object obj[]:results) {
+            System.out.println(obj.toString());
+            ProjectDetail projectDetail = new ProjectDetail();
+            projectDetail.setProjectId(Long.parseLong(obj[0]+""));
+            projectDetail.setEmployerId(Long.parseLong(obj[1]+""));
+            projectDetail.setProjectTitle(obj[2].toString());
+            projectDetail.setProjectBudget(obj[3].toString());
+            projectDetail.setProjectPeriod(obj[4].toString());
+            projectDetail.setAverageBid(Double.parseDouble(obj[5]+""));
+            projectDetail.setBidCount(Long.parseLong(obj[6]+""));
+            processedResults.add(projectDetail);
+        }
+        return processedResults;
+    }
+
+    public List<ProjectDetail> getUserProgressProjects(long userId){
+        String query="select c.name,sub1.* from (select a.id as project_id,a.employer_id,a.freelancer_id,a.title,a.end_date,b.bid_amount," +
+                "COALESCE(avg(b.bid_amount),0) as average ,count(b.project_id) as count from project a left outer join bid b " +
+                "on a.id=b.project_id where b.bid_status!='BID_SENT' and a.employer_id=" + userId + " group by a.id,a.title)" +
+                " as sub1,user c where c.id=sub1.freelancer_id";
+        List<Object[]> results = em.createNativeQuery(query).getResultList();
+        List<ProjectDetail> processedResults = new ArrayList<>();
+        for (Object obj[]:results) {
+            System.out.println(obj.toString());
+            ProjectDetail projectDetail = new ProjectDetail();
+            projectDetail.setFreelancerName(obj[0].toString());
+            projectDetail.setProjectId(Long.parseLong(obj[1]+""));
+            projectDetail.setEmployerId(Long.parseLong(obj[2]+""));
+            projectDetail.setFreelancerId(Long.parseLong(obj[3]+""));
+            projectDetail.setProjectTitle(obj[4].toString());
+            projectDetail.setEndDate(obj[5].toString());
+            projectDetail.setBidAmount(obj[6].toString());
+            projectDetail.setAverageBid(Double.parseDouble(obj[7]+""));
+            projectDetail.setBidCount(Long.parseLong(obj[8]+""));
+
+            processedResults.add(projectDetail);
+        }
+        return processedResults;
+    }
+
+
+    public List<ProjectDetail> getUserBidProjects(long userId){
+        String query="select c.name,sub1.* from (select a.id,a.employer_id,a.title,a.main_skill_id,a.budget_range,a.budget_period," +
+                "b.bid_amount,b.bid_status,b.user_id,COALESCE(avg(b.bid_amount),0) as average ,count(b.project_id) as " +
+                "count from project a left outer join bid b on a.id=b.project_id group by a.id,b.user_id) as " +
+                "sub1,user c where c.id=sub1.employer_id and sub1.employer_id!="+ userId+ " and sub1.user_id=" + userId;
+        List<Object[]> results = em.createNativeQuery(query).getResultList();
+        List<ProjectDetail> processedResults = new ArrayList<>();
+        for (Object obj[]:results) {
+            System.out.println(obj.toString());
+            ProjectDetail projectDetail = new ProjectDetail();
+            projectDetail.setEmployerName(obj[0].toString());
+            projectDetail.setProjectId(Long.parseLong(obj[1]+""));
+            projectDetail.setEmployerId(Long.parseLong(obj[2]+""));
+            projectDetail.setProjectTitle(obj[3].toString());
+            projectDetail.setProjectSkill(obj[4].toString());
+            projectDetail.setProjectBudget(obj[5].toString());
+            projectDetail.setProjectPeriod(obj[6].toString());
+            projectDetail.setBidAmount(obj[7].toString());
+            projectDetail.setBidStatus(obj[8].toString());
+            projectDetail.setAverageBid(Double.parseDouble(obj[10]+""));
+            projectDetail.setBidCount(Long.parseLong(obj[11]+""));
+
+            processedResults.add(projectDetail);
+        }
+        return processedResults;
+    }
+
+}
+.
+=== C:\Users\sagen\OneDrive\Desktop\Web Dev\class_class\Crowdsourcing_Marketplace_SpringBoot\FreelancerUsingSpringBoot\src\main\java\com\freelancer\Service\ProjectService.java === 
+package com.freelancer.Service;
+
+import java.util.List;
+import java.util.ArrayList;
+
+import com.freelancer.Entity.Bid;
+import com.freelancer.Entity.Project;
+import com.freelancer.Repository.ProjectRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+
+import java.util.Optional;
+
+
+@Service
+public class ProjectService{
+
+    @Autowired
+    private ProjectRepository projectRepository;
+    private static final Logger logger = LoggerFactory.getLogger(BidService.class);
+
+    public Project findById(long id) {
+        Optional<Project> exist = projectRepository.findById(id);
+        if(exist.isPresent()){
+            return exist.get();
+        }else{
+            return null;
+        }
+    }
+
+    public Project save(Project project) {
+        Project p = projectRepository.save(project);
+        return p;
+    }
+
+    public Iterable<Project> getAllProjects(){
+        return projectRepository.findAll();
+    }
+
+    public List<Project> findByEmployerId(long employerId) {
+        return projectRepository.findByEmployerId(employerId);
+    }
+
+
+}
+
+.
+=== C:\Users\sagen\OneDrive\Desktop\Web Dev\class_class\Crowdsourcing_Marketplace_SpringBoot\FreelancerUsingSpringBoot\src\main\java\com\freelancer\Service\UserService.java === 
+package com.freelancer.Service;
+
+import com.freelancer.Controller.UserController;
+import com.freelancer.Entity.User;
+import com.freelancer.Repository.UserRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.stereotype.Service;
+
+import javax.swing.text.html.Option;
+import java.util.List;
+import java.util.Optional;
+
+@Service
+public class UserService {
+    @Autowired
+    private UserRepository userRepository;
+    private static final Logger logger = LoggerFactory.getLogger(UserController.class);
+
+    private BCryptPasswordEncoder bCryptPasswordEncoder= new BCryptPasswordEncoder();
+
+    public Iterable<User> getAllUsers(){
+        return userRepository.findAll();
+    }
+
+    public User findById(long id){
+        Optional<User> exist = userRepository.findById(id);
+
+        if(exist.isPresent()){
+            return exist.get();
+        }else{
+            return null;
+        }
+    }
+
+    public User updateUser(User user){
+        User exist = userRepository.findByEmail(user.getEmail());
+        if(exist!=null){
+            logger.info(exist.toString());
+            logger.info("User exists with same email....Check if the same user");
+            if(exist.getId()==user.getId()){
+             User updatedUser= userRepository.save(user);
+                return updatedUser;
+            }else{
+                logger.error("Same email exist for other user");
+                return null;
+            }
+        }else{
+            logger.info("User does not exists with same email");
+            logger.info("Updating User");
+            User updatedUser=userRepository.save(user);
+            return updatedUser;
+        }
+    }
+
+    public User addUser(User user){
+        User exist = userRepository.findByEmail(user.getEmail());
+
+        if(exist!=null){
+            logger.info("User exists with same email");
+            logger.info(exist.toString());
+            return null;
+        }else{
+            logger.info("User does not exists with same email");
+            logger.info("Creating User");
+            String hashedPass = new String(bCryptPasswordEncoder.encode(user.getPassword()));
+            user.setPassword(hashedPass);
+            userRepository.save(user);
+            return user;
+        }
+    }
+
+    public User login(String email, String password){
+        User exist = userRepository.findByEmail(email);
+        if(exist!=null){
+            logger.info("User exists with email...checking password");
+            logger.info(exist.toString());
+            if(bCryptPasswordEncoder.matches(password,exist.getPassword())){
+                return exist;
+            }
+            else{
+                logger.info("User name password incorrect");
+                return null;
+            }
+        }else{
+            logger.info("User does not exists given email");
+            return null;
+        }
+    }
+}.
+=== C:\Users\sagen\OneDrive\Desktop\Web Dev\class_class\Crowdsourcing_Marketplace_SpringBoot\FreelancerUsingSpringBoot\src\main\java\com\freelancer\Utility\ResultObject.java === 
+package com.freelancer.Utility;
+
+public class ResultObject {
+    private String errorMsg;
+    private String successMsg;
+    private Object data;
+
+    public ResultObject(String errorMsg, String successMsg, Object data) {
+        this.errorMsg = errorMsg;
+        this.successMsg = successMsg;
+        this.data = data;
+    }
+
+    public String getErrorMsg() {
+        return errorMsg;
+    }
+
+    public void setErrorMsg(String errorMsg) {
+        this.errorMsg = errorMsg;
+    }
+
+    public String getSuccessMsg() {
+        return successMsg;
+    }
+
+    public void setSuccessMsg(String successMsg) {
+        this.successMsg = successMsg;
+    }
+
+    public Object getData() {
+        return data;
+    }
+
+    public void setData(Object data) {
+        this.data = data;
+    }
+}
+.
