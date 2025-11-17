@@ -20,7 +20,7 @@ function PostForm() {
     setError('');
 
     try {
-      // Fake delay like real API
+
       await new Promise(resolve => setTimeout(resolve, 1200));
 
       console.log('Submitted:', { title, body });
